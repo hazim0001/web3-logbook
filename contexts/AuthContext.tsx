@@ -1,85 +1,104 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useState, useContext, useEffect } from "react";
+import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import ApiClient from "../services/apiClient";
 
 interface User {
-  id: string;
-  name: string;
+  id: number;
   email: string;
-  licenseNumber?: string;
+  name: string;
+  role: string;
+  license_no?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  isAuthenticated: boolean;
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  isAuthenticated: boolean;
+  login: (email: string, password: string, totpCode?: string) => Promise<void>;
   logout: () => Promise<void>;
-  updateProfile: (userData: Partial<User>) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+const DEMO_EMAIL = "12345@gamil.com";
+const DEMO_PASSWORD = "12345";
+const DEMO_USER: User = {
+  id: 0,
+  email: DEMO_EMAIL,
+  name: "Demo Pilot",
+  role: "demo",
+  license_no: "DEMO-0000",
+};
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored auth token
-    checkAuthStatus();
+    loadStoredAuth();
   }, []);
 
-  const checkAuthStatus = async () => {
+  const loadStoredAuth = async () => {
+    try {
+      const accessToken = await SecureStore.getItemAsync("access_token");
+      const storedUser = await AsyncStorage.getItem("user");
+
+      if (accessToken && storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    } catch (error) {
+      console.error("Failed to load stored auth:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const login = async (email: string, password: string, totpCode?: string) => {
+    if (email === DEMO_EMAIL && password === DEMO_PASSWORD) {
+      await ApiClient.setTokens("demo-access-token", "demo-refresh-token");
+      await AsyncStorage.setItem("user", JSON.stringify(DEMO_USER));
+      setUser(DEMO_USER);
+      return;
+    }
+
+    try {
+      const response = await ApiClient.login(email, password, totpCode);
+      const { access_token, refresh_token, user: userData } = response;
+
+      await ApiClient.setTokens(access_token, refresh_token);
+      await AsyncStorage.setItem("user", JSON.stringify(userData));
+
+      setUser(userData);
+    } catch (error: any) {
+      console.error("Login error:", error);
+      throw new Error(error.response?.data?.error || "Login failed");
+    }
+  };
+
+  const logout = async () => {
+    try {
+      if (user?.email === DEMO_EMAIL) {
+        await ApiClient.clearTokens();
+      } else {
+        await ApiClient.logout();
+      }
+      await AsyncStorage.removeItem("user");
+      setUser(null);
+    } catch (error) {
+      console.error("Logout error:", error);
+    }
+  };
+
+  const refreshUser = async () => {
     try {
       const storedUser = await AsyncStorage.getItem("user");
       if (storedUser) {
         setUser(JSON.parse(storedUser));
       }
     } catch (error) {
-      console.error("Error checking auth status:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const login = async (email: string, password: string) => {
-    try {
-      // Simulate API call
-      // In a real app, you would call your authentication API here
-      const mockUser: User = {
-        id: "1",
-        name: "Captain John Doe",
-        email: email,
-        licenseNumber: "ATP12345",
-      };
-
-      await AsyncStorage.setItem("user", JSON.stringify(mockUser));
-      setUser(mockUser);
-    } catch (error) {
-      throw new Error("Login failed");
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await AsyncStorage.removeItem("user");
-      setUser(null);
-    } catch (error) {
-      console.error("Error logging out:", error);
-    }
-  };
-
-  const updateProfile = async (userData: Partial<User>) => {
-    try {
-      if (user) {
-        const updatedUser = { ...user, ...userData };
-        await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
-        setUser(updatedUser);
-      }
-    } catch (error) {
-      console.error("Error updating profile:", error);
-      throw error;
+      console.error("Failed to refresh user:", error);
     }
   };
 
@@ -87,22 +106,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     <AuthContext.Provider
       value={{
         user,
-        isAuthenticated: !!user,
         loading,
+        isAuthenticated: !!user,
         login,
         logout,
-        updateProfile,
+        refreshUser,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
-};
+}
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
+  if (!context) {
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
-};
+}

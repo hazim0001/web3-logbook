@@ -1,112 +1,119 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import NetInfo from "@react-native-community/netinfo";
-import { useDatabase } from "./DatabaseContext";
-import database from "../services/database";
-
-interface SyncStatus {
-  isOnline: boolean;
-  lastSyncTime: Date | null;
-  pendingChanges: number;
-  syncing: boolean;
-}
+import React, {
+  createContext,
+  useState,
+  useContext,
+  useEffect,
+  useCallback,
+} from "react";
+import { showMessage } from "react-native-flash-message";
+import SyncService, {
+  SyncStatus,
+  SyncStats,
+} from "../services/syncService";
 
 interface SyncContextType {
   syncStatus: SyncStatus;
+  syncStats: SyncStats | null;
+  isSyncing: boolean;
   syncNow: () => Promise<void>;
+  refreshStats: () => Promise<void>;
 }
 
 const SyncContext = createContext<SyncContextType | undefined>(undefined);
 
-export const SyncProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
-  const { flights, refreshFlights } = useDatabase();
+export function SyncProvider({ children }: { children: React.ReactNode }) {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({
-    isOnline: true,
-    lastSyncTime: null,
-    pendingChanges: 0,
-    syncing: false,
+    status: "idle",
+    progress: 0,
   });
+  const [syncStats, setSyncStats] = useState<SyncStats | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  useEffect(() => {
-    // Monitor network status
-    const unsubscribe = NetInfo.addEventListener((state) => {
-      setSyncStatus((prev) => ({
-        ...prev,
-        isOnline: state.isConnected ?? false,
-      }));
-
-      // Auto-sync when coming online
-      if (
-        state.isConnected &&
-        !syncStatus.syncing &&
-        syncStatus.pendingChanges > 0
-      ) {
-        syncNow();
-      }
-    });
-
-    return () => unsubscribe();
+  const refreshStats = useCallback(async () => {
+    try {
+      const stats = await SyncService.getSyncStats();
+      setSyncStats(stats);
+    } catch (error) {
+      console.error("Failed to refresh stats:", error);
+    }
   }, []);
 
   useEffect(() => {
-    const pending = flights.filter(
-      (flight) => flight.syncStatus !== "synced"
-    ).length;
+    SyncService.registerBackgroundSync();
 
-    setSyncStatus((prev) => ({
-      ...prev,
-      pendingChanges: pending,
-    }));
-  }, [flights]);
+    const unsubscribe = SyncService.onSyncStatusChange((status) => {
+      setSyncStatus(status);
+      setIsSyncing(status.status === "syncing");
+    });
 
-  const syncNow = async () => {
-    if (syncStatus.syncing || !syncStatus.isOnline) return;
+    refreshStats();
 
-    setSyncStatus((prev) => ({ ...prev, syncing: true }));
+    return () => {
+      unsubscribe();
+      SyncService.unregisterBackgroundSync();
+    };
+  }, [refreshStats]);
 
-    try {
-      // Simulate API sync
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      const unsynced = flights.filter(
-        (flight) => flight.syncStatus !== "synced" && flight.id
-      );
-
-      await Promise.all(
-        unsynced.map((flight) =>
-          database.markAsSynced(
-            flight.id!,
-            flight.serverId ?? flight.id!
-          )
-        )
-      );
-
-      await refreshFlights();
-
-      setSyncStatus((prev) => ({
-        ...prev,
-        syncing: false,
-        lastSyncTime: new Date(),
-        pendingChanges: 0,
-      }));
-    } catch (error) {
-      console.error("Sync failed:", error);
-      setSyncStatus((prev) => ({ ...prev, syncing: false }));
+  const syncNow = useCallback(async () => {
+    if (isSyncing) {
+      showMessage({
+        message: "Sync already in progress",
+        type: "info",
+      });
+      return;
     }
-  };
+
+    const result = await SyncService.syncNow();
+
+    if (result.success) {
+      if (result.synced && result.synced > 0) {
+        showMessage({
+          message: `Successfully synced ${result.synced} entries`,
+          type: "success",
+        });
+      } else {
+        showMessage({
+          message: "Everything is up to date",
+          type: "info",
+        });
+      }
+
+      if (result.failed && result.failed > 0) {
+        showMessage({
+          message: `${result.failed} entries failed to sync`,
+          type: "warning",
+        });
+      }
+
+    } else {
+      showMessage({
+        message: result.error || "Sync failed",
+        type: "danger",
+      });
+    }
+
+    await refreshStats();
+  }, [isSyncing, refreshStats]);
 
   return (
-    <SyncContext.Provider value={{ syncStatus, syncNow }}>
+    <SyncContext.Provider
+      value={{
+        syncStatus,
+        syncStats,
+        isSyncing,
+        syncNow,
+        refreshStats,
+      }}
+    >
       {children}
     </SyncContext.Provider>
   );
-};
+}
 
-export const useSync = () => {
+export function useSync() {
   const context = useContext(SyncContext);
-  if (context === undefined) {
-    throw new Error("useSync must be used within a SyncProvider");
+  if (!context) {
+    throw new Error("useSync must be used within SyncProvider");
   }
   return context;
-};
+}

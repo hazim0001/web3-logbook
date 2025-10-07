@@ -1,268 +1,605 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   ScrollView,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  Alert,
+  TouchableOpacity,
+  Image,
 } from "react-native";
-import { Input, Button, Text } from "@rneui/themed";
-import { useDatabase } from "../contexts/DatabaseContext";
-import { useNavigation } from "@react-navigation/native";
+import {
+  Input,
+  Button,
+  Text,
+  Icon,
+} from "@rneui/themed";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import * as ImagePicker from "expo-image-picker";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useAuth } from "../contexts/AuthContext";
+import { useTheme } from "../contexts/ThemeContext";
+import database, { FlightEntry } from "../services/database";
+import { showMessage } from "react-native-flash-message";
+
+interface Attachment {
+  uri: string;
+  filename: string;
+  size: number;
+}
+
+interface RouteParams {
+  entryId?: number;
+  flightId?: number;
+}
 
 export default function AddFlightScreen() {
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [aircraftType, setAircraftType] = useState("");
+  const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const { user } = useAuth();
+  const { theme } = useTheme();
+
+  const params = route.params as RouteParams | undefined;
+  const entryId = params?.entryId ?? params?.flightId;
+
+  const [saving, setSaving] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+
+  const [flightDate, setFlightDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [aircraftReg, setAircraftReg] = useState("");
+  const [aircraftType, setAircraftType] = useState("");
   const [routeFrom, setRouteFrom] = useState("");
   const [routeTo, setRouteTo] = useState("");
-  const [totalTime, setTotalTime] = useState("");
-  const [picTime, setPicTime] = useState("");
-  const [sicTime, setSicTime] = useState("");
-  const [dualTime, setDualTime] = useState("");
-  const [nightTime, setNightTime] = useState("");
-  const [instrumentTime, setInstrumentTime] = useState("");
+  const [picHours, setPicHours] = useState("");
+  const [picMinutes, setPicMinutes] = useState("");
+  const [sicHours, setSicHours] = useState("");
+  const [sicMinutes, setSicMinutes] = useState("");
+  const [dualHours, setDualHours] = useState("");
+  const [dualMinutes, setDualMinutes] = useState("");
+  const [nightHours, setNightHours] = useState("");
+  const [nightMinutes, setNightMinutes] = useState("");
+  const [instrumentHours, setInstrumentHours] = useState("");
+  const [instrumentMinutes, setInstrumentMinutes] = useState("");
   const [landingsDay, setLandingsDay] = useState("");
   const [landingsNight, setLandingsNight] = useState("");
   const [remarks, setRemarks] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
 
-  const { addFlight } = useDatabase();
-  const navigation = useNavigation();
-  const { user } = useAuth();
-
-  const handleSubmit = async () => {
-    const pilotId = Number(user?.id);
-    if (!pilotId) {
-      Alert.alert("Error", "You must be logged in to log a flight.");
-      return;
+  useEffect(() => {
+    if (entryId) {
+      setIsEditMode(true);
+      loadEntry(entryId);
     }
+  }, [entryId]);
 
-    if (!aircraftType || !aircraftReg || !routeFrom || !routeTo || !totalTime) {
-      Alert.alert("Error", "Please fill in all required fields");
-      return;
-    }
-
-    const totalMinutes = parseFloat(totalTime) * 60;
-    const picMinutes = picTime ? parseFloat(picTime) * 60 : undefined;
-    const sicMinutes = sicTime ? parseFloat(sicTime) * 60 : 0;
-    const dualMinutes = dualTime ? parseFloat(dualTime) * 60 : 0;
-    const nightMinutes = nightTime ? parseFloat(nightTime) * 60 : 0;
-    const instrumentMinutes = instrumentTime
-      ? parseFloat(instrumentTime) * 60
-      : 0;
-    const dayLandings = landingsDay ? parseInt(landingsDay, 10) : 0;
-    const nightLandings = landingsNight ? parseInt(landingsNight, 10) : 0;
-
-    if (isNaN(totalMinutes)) {
-      Alert.alert("Error", "Please enter valid time values");
-      return;
-    }
-
-    setLoading(true);
+  const loadEntry = async (id: number) => {
     try {
-      await addFlight({
-        flightDate: date,
-        aircraftType,
-        aircraftReg,
-        routeFrom,
-        routeTo,
-        totalTime: totalMinutes,
-        picTime: picMinutes ?? 0,
-        sicTime: sicMinutes,
-        dualTime: dualMinutes,
-        nightTime: nightMinutes,
-        instrumentTime: instrumentMinutes,
-        landingsDay: dayLandings,
-        landingsNight: nightLandings,
-        pilotId,
-        remarks,
-        attachments: undefined,
-        serverId: undefined,
-      });
+      const entry = await database.getEntry(id);
+      if (!entry) {
+        throw new Error("Entry not found");
+      }
 
-      Alert.alert("Success", "Flight added successfully", [
-        { text: "OK", onPress: () => navigation.goBack() },
-      ]);
+      setFlightDate(new Date(entry.flightDate));
+      setAircraftReg(entry.aircraftReg);
+      setAircraftType(entry.aircraftType ?? "");
+      setRouteFrom(entry.routeFrom ?? "");
+      setRouteTo(entry.routeTo ?? "");
+      setPicHours(Math.floor(entry.picTime / 60).toString());
+      setPicMinutes((entry.picTime % 60).toString());
+      setSicHours(Math.floor(entry.sicTime / 60).toString());
+      setSicMinutes((entry.sicTime % 60).toString());
+      setDualHours(Math.floor(entry.dualTime / 60).toString());
+      setDualMinutes((entry.dualTime % 60).toString());
+      setNightHours(Math.floor(entry.nightTime / 60).toString());
+      setNightMinutes((entry.nightTime % 60).toString());
+      setInstrumentHours(Math.floor(entry.instrumentTime / 60).toString());
+      setInstrumentMinutes((entry.instrumentTime % 60).toString());
+      setLandingsDay(entry.landingsDay.toString());
+      setLandingsNight(entry.landingsNight.toString());
+      setRemarks(entry.remarks ?? "");
+
+      if (entry.attachments) {
+        try {
+          setAttachments(JSON.parse(entry.attachments));
+        } catch {
+          setAttachments([]);
+        }
+      }
     } catch (error) {
-      Alert.alert("Error", "Failed to add flight");
-    } finally {
-      setLoading(false);
+      console.error("Failed to load entry:", error);
+      showMessage({ message: "Failed to load entry", type: "danger" });
+      navigation.goBack();
     }
   };
 
+  const convertToMinutes = (hours: string, minutes: string) => {
+    const h = parseInt(hours || "0", 10);
+    const m = parseInt(minutes || "0", 10);
+    return h * 60 + m;
+  };
+
+  const totalMinutes = useMemo(() => {
+    const pic = convertToMinutes(picHours, picMinutes);
+    const sic = convertToMinutes(sicHours, sicMinutes);
+    const dual = convertToMinutes(dualHours, dualMinutes);
+    return Math.max(pic, sic, dual);
+  }, [picHours, picMinutes, sicHours, sicMinutes, dualHours, dualMinutes]);
+
+  const validateForm = () => {
+    if (!aircraftReg.trim()) {
+      showMessage({ message: "Aircraft registration is required", type: "warning" });
+      return false;
+    }
+
+    if (!routeFrom.trim() || !routeTo.trim()) {
+      showMessage({ message: "Route is required", type: "warning" });
+      return false;
+    }
+
+    if (totalMinutes === 0) {
+      showMessage({ message: "Please enter flight time", type: "warning" });
+      return false;
+    }
+
+    return true;
+  };
+
+  const pickImage = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      showMessage({ message: "Photo library access is required", type: "warning" });
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.7,
+    });
+
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      const newAttachment: Attachment = {
+        uri: asset.uri,
+        filename: asset.fileName ?? `photo_${Date.now()}.jpg`,
+        size: asset.fileSize ?? 0,
+      };
+      setAttachments((prev) => [...prev, newAttachment]);
+    }
+  };
+
+  const takePhoto = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      showMessage({ message: "Camera access is required", type: "warning" });
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      quality: 0.7,
+    });
+
+    if (!result.canceled && result.assets?.[0]) {
+      const asset = result.assets[0];
+      const newAttachment: Attachment = {
+        uri: asset.uri,
+        filename: asset.fileName ?? `photo_${Date.now()}.jpg`,
+        size: asset.fileSize ?? 0,
+      };
+      setAttachments((prev) => [...prev, newAttachment]);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSave = async (asDraft = true) => {
+    if (!user) {
+      showMessage({ message: "You must be logged in to log a flight", type: "danger" });
+      return;
+    }
+
+    if (!validateForm()) {
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const payload: Omit<FlightEntry, "id" | "createdAt" | "updatedAt"> = {
+        pilotId: user.id,
+        status: asDraft ? "draft" : "submitted",
+        flightDate: flightDate.toISOString().split("T")[0],
+        aircraftReg: aircraftReg.toUpperCase().trim(),
+        aircraftType: aircraftType.trim() || undefined,
+        routeFrom: routeFrom.toUpperCase().trim(),
+        routeTo: routeTo.toUpperCase().trim(),
+        picTime: convertToMinutes(picHours, picMinutes),
+        sicTime: convertToMinutes(sicHours, sicMinutes),
+        dualTime: convertToMinutes(dualHours, dualMinutes),
+        nightTime: convertToMinutes(nightHours, nightMinutes),
+        instrumentTime: convertToMinutes(instrumentHours, instrumentMinutes),
+        totalTime: totalMinutes,
+        landingsDay: parseInt(landingsDay || "0", 10),
+        landingsNight: parseInt(landingsNight || "0", 10),
+        remarks: remarks.trim() || undefined,
+        attachments: attachments.length > 0 ? JSON.stringify(attachments) : undefined,
+        syncStatus: "pending",
+      };
+
+      if (isEditMode && entryId) {
+        await database.updateEntry(entryId, payload);
+        showMessage({ message: "Flight entry updated", type: "success" });
+      } else {
+        await database.createEntry(payload);
+        showMessage({
+          message: `Flight entry ${asDraft ? "saved as draft" : "saved"}`,
+          type: "success",
+        });
+      }
+
+      navigation.goBack();
+    } catch (error) {
+      console.error("Save error:", error);
+      showMessage({ message: "Failed to save flight entry", type: "danger" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        container: {
+          flex: 1,
+          backgroundColor: theme.colors.background,
+        },
+        scrollView: {
+          flex: 1,
+        },
+        section: {
+          paddingHorizontal: 16,
+          paddingVertical: 16,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: theme.colors.border,
+        },
+        sectionTitle: {
+          fontSize: 18,
+          fontWeight: "600",
+          color: theme.colors.text,
+          marginBottom: 16,
+        },
+        row: {
+          flexDirection: "row",
+          gap: 12,
+        },
+        halfInput: {
+          flex: 1,
+        },
+        label: {
+          fontSize: 13,
+          fontWeight: "500",
+          color: theme.colors.textSecondary,
+          marginLeft: 4,
+          marginBottom: 4,
+        },
+        dateButton: {
+          marginBottom: 16,
+        },
+        attachmentButtons: {
+          flexDirection: "row",
+          gap: 12,
+          marginBottom: 12,
+        },
+        attachmentButton: {
+          flex: 1,
+        },
+        attachmentsList: {
+          flexDirection: "row",
+          flexWrap: "wrap",
+          gap: 12,
+        },
+        attachmentItem: {
+          width: 100,
+          height: 100,
+          borderRadius: 12,
+          overflow: "hidden",
+          position: "relative",
+        },
+        attachmentImage: {
+          width: "100%",
+          height: "100%",
+        },
+        removeButton: {
+          position: "absolute",
+          top: -8,
+          right: -8,
+          backgroundColor: theme.colors.card,
+          borderRadius: 12,
+        },
+        buttonContainer: {
+          padding: 16,
+          gap: 12,
+        },
+        draftButton: {
+          backgroundColor: theme.colors.textSecondary,
+          borderRadius: 12,
+          paddingVertical: 14,
+        },
+        saveButton: {
+          backgroundColor: theme.colors.primary,
+          borderRadius: 12,
+          paddingVertical: 14,
+        },
+        bottomPadding: {
+          height: 40,
+        },
+      }),
+    [theme]
+  );
+
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
-          <Text h4 style={styles.title}>
-            Log New Flight
-          </Text>
-
-          <Input
-            label="Date"
-            placeholder="YYYY-MM-DD"
-            value={date}
-            onChangeText={setDate}
-            leftIcon={{ type: "ionicon", name: "calendar-outline" }}
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Flight Details</Text>
+          <Button
+            title={flightDate.toLocaleDateString()}
+            type="outline"
+            onPress={() => setShowDatePicker(true)}
+            containerStyle={styles.dateButton}
+            icon={{ name: "calendar-outline", type: "ionicon", color: theme.colors.primary }}
+            titleStyle={{ color: theme.colors.primary }}
+            buttonStyle={{ borderColor: theme.colors.primary }}
           />
 
-          <Input
-            label="Aircraft Type *"
-            placeholder="e.g., B737, A320"
-            value={aircraftType}
-            onChangeText={setAircraftType}
-            leftIcon={{ type: "ionicon", name: "airplane-outline" }}
-          />
+          {showDatePicker ? (
+            <DateTimePicker
+              value={flightDate}
+              mode="date"
+              display="default"
+              onChange={(_, date) => {
+                setShowDatePicker(false);
+                if (date) {
+                  setFlightDate(date);
+                }
+              }}
+            />
+          ) : null}
 
           <Input
-            label="Registration *"
-            placeholder="e.g., N12345"
+            label="Aircraft Registration *"
+            placeholder="N12345"
             value={aircraftReg}
             onChangeText={setAircraftReg}
             autoCapitalize="characters"
-            leftIcon={{ type: "ionicon", name: "pricetag-outline" }}
+            autoCorrect={false}
+            leftIcon={{ type: "ionicon", name: "airplane-outline", color: theme.colors.primary }}
           />
 
           <Input
-            label="From *"
-            placeholder="e.g., JFK"
-            value={routeFrom}
-            onChangeText={setRouteFrom}
+            label="Aircraft Type"
+            placeholder="C172, B737, A320, etc."
+            value={aircraftType}
+            onChangeText={setAircraftType}
             autoCapitalize="characters"
-            leftIcon={{ type: "ionicon", name: "location-outline" }}
+            leftIcon={{ type: "ionicon", name: "information-circle-outline", color: theme.colors.primary }}
           />
 
-          <Input
-            label="To *"
-            placeholder="e.g., LAX"
-            value={routeTo}
-            onChangeText={setRouteTo}
-            autoCapitalize="characters"
-            leftIcon={{ type: "ionicon", name: "location-outline" }}
-          />
+          <View style={styles.row}>
+            <Input
+              label="From *"
+              placeholder="KJFK"
+              value={routeFrom}
+              onChangeText={setRouteFrom}
+              autoCapitalize="characters"
+              containerStyle={styles.halfInput}
+            />
+            <Input
+              label="To *"
+              placeholder="KLAX"
+              value={routeTo}
+              onChangeText={setRouteTo}
+              autoCapitalize="characters"
+              containerStyle={styles.halfInput}
+            />
+          </View>
+        </View>
 
-          <Input
-            label="Total Flight Time (hours) *"
-            placeholder="e.g., 2.5"
-            value={totalTime}
-            onChangeText={setTotalTime}
-            keyboardType="decimal-pad"
-            leftIcon={{ type: "ionicon", name: "time-outline" }}
-          />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Flight Time</Text>
 
-          <Input
-            label="PIC Time (hours)"
-            placeholder="e.g., 2.5"
-            value={picTime}
-            onChangeText={setPicTime}
-            keyboardType="decimal-pad"
-            leftIcon={{ type: "ionicon", name: "person-outline" }}
-          />
+          <Text style={styles.label}>PIC Time</Text>
+          <View style={styles.row}>
+            <Input
+              placeholder="Hours"
+              value={picHours}
+              onChangeText={setPicHours}
+              keyboardType="numeric"
+              containerStyle={styles.halfInput}
+            />
+            <Input
+              placeholder="Minutes"
+              value={picMinutes}
+              onChangeText={setPicMinutes}
+              keyboardType="numeric"
+              containerStyle={styles.halfInput}
+            />
+          </View>
 
-          <Input
-            label="SIC Time (hours)"
-            placeholder="Optional"
-            value={sicTime}
-            onChangeText={setSicTime}
-            keyboardType="decimal-pad"
-            leftIcon={{ type: "ionicon", name: "people-outline" }}
-          />
+          <Text style={styles.label}>SIC Time</Text>
+          <View style={styles.row}>
+            <Input
+              placeholder="Hours"
+              value={sicHours}
+              onChangeText={setSicHours}
+              keyboardType="numeric"
+              containerStyle={styles.halfInput}
+            />
+            <Input
+              placeholder="Minutes"
+              value={sicMinutes}
+              onChangeText={setSicMinutes}
+              keyboardType="numeric"
+              containerStyle={styles.halfInput}
+            />
+          </View>
 
-          <Input
-            label="Dual Time (hours)"
-            placeholder="Optional"
-            value={dualTime}
-            onChangeText={setDualTime}
-            keyboardType="decimal-pad"
-            leftIcon={{ type: "ionicon", name: "sync-outline" }}
-          />
+          <Text style={styles.label}>Dual Time</Text>
+          <View style={styles.row}>
+            <Input
+              placeholder="Hours"
+              value={dualHours}
+              onChangeText={setDualHours}
+              keyboardType="numeric"
+              containerStyle={styles.halfInput}
+            />
+            <Input
+              placeholder="Minutes"
+              value={dualMinutes}
+              onChangeText={setDualMinutes}
+              keyboardType="numeric"
+              containerStyle={styles.halfInput}
+            />
+          </View>
 
-          <Input
-            label="Night Time (hours)"
-            placeholder="Optional"
-            value={nightTime}
-            onChangeText={setNightTime}
-            keyboardType="decimal-pad"
-            leftIcon={{ type: "ionicon", name: "moon-outline" }}
-          />
+          <Text style={styles.label}>Night Time</Text>
+          <View style={styles.row}>
+            <Input
+              placeholder="Hours"
+              value={nightHours}
+              onChangeText={setNightHours}
+              keyboardType="numeric"
+              containerStyle={styles.halfInput}
+            />
+            <Input
+              placeholder="Minutes"
+              value={nightMinutes}
+              onChangeText={setNightMinutes}
+              keyboardType="numeric"
+              containerStyle={styles.halfInput}
+            />
+          </View>
 
-          <Input
-            label="Instrument Time (hours)"
-            placeholder="Optional"
-            value={instrumentTime}
-            onChangeText={setInstrumentTime}
-            keyboardType="decimal-pad"
-            leftIcon={{ type: "ionicon", name: "speedometer-outline" }}
-          />
+          <Text style={styles.label}>Instrument Time</Text>
+          <View style={styles.row}>
+            <Input
+              placeholder="Hours"
+              value={instrumentHours}
+              onChangeText={setInstrumentHours}
+              keyboardType="numeric"
+              containerStyle={styles.halfInput}
+            />
+            <Input
+              placeholder="Minutes"
+              value={instrumentMinutes}
+              onChangeText={setInstrumentMinutes}
+              keyboardType="numeric"
+              containerStyle={styles.halfInput}
+            />
+          </View>
+        </View>
 
-          <Input
-            label="Day Landings"
-            placeholder="0"
-            value={landingsDay}
-            onChangeText={setLandingsDay}
-            keyboardType="number-pad"
-            leftIcon={{ type: "ionicon", name: "sunny-outline" }}
-          />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Landings</Text>
+          <View style={styles.row}>
+            <Input
+              label="Day"
+              placeholder="0"
+              value={landingsDay}
+              onChangeText={setLandingsDay}
+              keyboardType="numeric"
+              containerStyle={styles.halfInput}
+            />
+            <Input
+              label="Night"
+              placeholder="0"
+              value={landingsNight}
+              onChangeText={setLandingsNight}
+              keyboardType="numeric"
+              containerStyle={styles.halfInput}
+            />
+          </View>
+        </View>
 
-          <Input
-            label="Night Landings"
-            placeholder="0"
-            value={landingsNight}
-            onChangeText={setLandingsNight}
-            keyboardType="number-pad"
-            leftIcon={{ type: "ionicon", name: "moon-outline" }}
-          />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Attachments</Text>
+          <View style={styles.attachmentButtons}>
+            <Button
+              title="Take Photo"
+              type="outline"
+              onPress={takePhoto}
+              icon={{ name: "camera-outline", type: "ionicon", color: theme.colors.primary }}
+              titleStyle={{ color: theme.colors.primary }}
+              buttonStyle={{ borderColor: theme.colors.primary }}
+              containerStyle={styles.attachmentButton}
+            />
+            <Button
+              title="Choose Photo"
+              type="outline"
+              onPress={pickImage}
+              icon={{ name: "images-outline", type: "ionicon", color: theme.colors.primary }}
+              titleStyle={{ color: theme.colors.primary }}
+              buttonStyle={{ borderColor: theme.colors.primary }}
+              containerStyle={styles.attachmentButton}
+            />
+          </View>
 
+          {attachments.length > 0 && (
+            <View style={styles.attachmentsList}>
+              {attachments.map((attachment, index) => (
+                <View key={`${attachment.uri}-${index}`} style={styles.attachmentItem}>
+                  <Image source={{ uri: attachment.uri }} style={styles.attachmentImage} />
+                  <TouchableOpacity
+                    style={styles.removeButton}
+                    onPress={() => removeAttachment(index)}
+                  >
+                    <Icon name="close-circle" type="ionicon" color={theme.colors.error} size={24} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Remarks</Text>
           <Input
-            label="Remarks"
-            placeholder="Optional notes"
+            placeholder="Additional notes..."
             value={remarks}
             onChangeText={setRemarks}
             multiline
-            numberOfLines={3}
-            leftIcon={{ type: "ionicon", name: "document-text-outline" }}
-          />
-
-          <Button
-            title="Add Flight"
-            onPress={handleSubmit}
-            loading={loading}
-            buttonStyle={styles.button}
-            containerStyle={styles.buttonContainer}
+            numberOfLines={4}
           />
         </View>
+
+        <View style={styles.buttonContainer}>
+          <Button
+            title="Save as Draft"
+            onPress={() => handleSave(true)}
+            loading={saving}
+            buttonStyle={styles.draftButton}
+          />
+          <Button
+            title={isEditMode ? "Update" : "Save"}
+            onPress={() => handleSave(false)}
+            loading={saving}
+            buttonStyle={styles.saveButton}
+          />
+        </View>
+
+        <View style={styles.bottomPadding} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    padding: 20,
-  },
-  title: {
-    marginBottom: 20,
-    color: "#333",
-  },
-  buttonContainer: {
-    marginTop: 20,
-    marginBottom: 40,
-  },
-  button: {
-    backgroundColor: "#007AFF",
-    paddingVertical: 12,
-  },
-});

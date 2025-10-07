@@ -1,29 +1,70 @@
 {
   "expo": {
-    "name": "simple-react-native-app",
-    "slug": "simple-react-native-app",
+    "name": "FlightLog",
+    "slug": "flightlog-pilot",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#007AFF"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.flightlog.pilot",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app requires camera access to attach photos to flight entries.",
+        "NSPhotoLibraryUsageDescription": "This app requires photo library access to attach images to flight entries.",
+        "UIBackgroundModes": [
+          "fetch"
+        ],
+        "BGTaskSchedulerPermittedIdentifiers": [
+          "com.flightlog.pilot.background-sync"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#007AFF"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.flightlog.pilot",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "The app accesses your photos to let you attach images to flight entries.",
+          "cameraPermission": "The app accesses your camera to let you take photos for flight entries."
+        }
+      ]
+    ],
+    "extra": {
+      "env": "development",
+      "eas": {
+        "projectId": "your-project-id"
+      }
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
     }
   }
 }

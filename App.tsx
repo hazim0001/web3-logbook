@@ -1,13 +1,19 @@
 import "react-native-gesture-handler";
-import React from "react";
-import { ActivityIndicator, View } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import React, { useMemo } from "react";
+import {
+  NavigationContainer,
+  DefaultTheme as NavigationDefaultTheme,
+  DarkTheme as NavigationDarkTheme,
+} from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
+import FlashMessage from "react-native-flash-message";
 import { Icon } from "@rneui/themed";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { SyncProvider } from "./contexts/SyncContext";
 import { DatabaseProvider } from "./contexts/DatabaseContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { useTheme } from "./contexts/ThemeContext";
 import LoginScreen from "./screens/LoginScreen";
 import LogbookScreen from "./screens/LogbookScreen";
 import AddFlightScreen from "./screens/AddFlightScreen";
@@ -15,50 +21,47 @@ import FlightDetailScreen from "./screens/FlightDetailScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import SyncStatusScreen from "./screens/SyncStatusScreen";
 
-type LogbookStackParamList = {
-  Logbook: undefined;
-  FlightDetail: { flightId: number | undefined };
-  AddFlight: undefined;
-};
+const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
 
-type MainTabParamList = {
-  LogbookTab: undefined;
-  Add: undefined;
-  Sync: undefined;
-  Profile: undefined;
-};
+function LogbookStack() {
+  const { theme } = useTheme();
 
-type AuthStackParamList = {
-  Login: undefined;
-};
-
-const Tab = createBottomTabNavigator<MainTabParamList>();
-const LogbookStack = createNativeStackNavigator<LogbookStackParamList>();
-const AuthStack = createNativeStackNavigator<AuthStackParamList>();
-
-function LogbookStackNavigator() {
   return (
-    <LogbookStack.Navigator id={undefined}>
-      <LogbookStack.Screen
+    <Stack.Navigator
+      id={undefined}
+      screenOptions={{
+        headerStyle: { backgroundColor: theme.colors.card },
+        headerTintColor: theme.colors.text,
+        headerTitleStyle: { color: theme.colors.text },
+        contentStyle: { backgroundColor: theme.colors.background },
+      }}
+    >
+      <Stack.Screen
         name="Logbook"
         component={LogbookScreen}
         options={{ title: "My Logbook" }}
       />
-      <LogbookStack.Screen
+      <Stack.Screen
         name="FlightDetail"
         component={FlightDetailScreen}
         options={{ title: "Flight Details" }}
       />
-      <LogbookStack.Screen
+      <Stack.Screen
         name="AddFlight"
         component={AddFlightScreen}
-        options={{ title: "Add Flight", presentation: "modal" }}
+        options={{
+          title: "Add Flight",
+          presentation: "modal",
+        }}
       />
-    </LogbookStack.Navigator>
+    </Stack.Navigator>
   );
 }
 
 function MainTabs() {
+  const { theme } = useTheme();
+
   return (
     <Tab.Navigator
       id={undefined}
@@ -70,37 +73,54 @@ function MainTabs() {
             iconName = "book";
           } else if (route.name === "Add") {
             iconName = "add-circle";
-          } else if (route.name === "Profile") {
-            iconName = "person";
-          } else {
+          } else if (route.name === "Sync") {
             iconName = "sync";
+          } else {
+            iconName = "person";
           }
 
           return <Icon name={iconName} type="ionicon" size={size} color={color} />;
         },
-        tabBarActiveTintColor: "#007AFF",
-        tabBarInactiveTintColor: "gray",
+        tabBarActiveTintColor: theme.colors.primary,
+        tabBarInactiveTintColor: theme.colors.textSecondary,
+        tabBarStyle: {
+          backgroundColor: theme.colors.card,
+          borderTopColor: theme.colors.border,
+        },
+        headerShown: false,
+        headerStyle: { backgroundColor: theme.colors.card },
+        headerTintColor: theme.colors.text,
+        headerTitleStyle: { color: theme.colors.text },
       })}
     >
       <Tab.Screen
         name="LogbookTab"
-        component={LogbookStackNavigator}
-        options={{ title: "Logbook", headerShown: false }}
+        component={LogbookStack}
+        options={{ title: "Logbook" }}
       />
       <Tab.Screen
         name="Add"
         component={AddFlightScreen}
-        options={{ title: "Add Flight" }}
+        options={{
+          title: "Add Flight",
+          headerShown: true,
+        }}
       />
       <Tab.Screen
         name="Sync"
         component={SyncStatusScreen}
-        options={{ title: "Sync" }}
+        options={{
+          title: "Sync",
+          headerShown: true,
+        }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{ title: "Profile" }}
+        options={{
+          title: "Profile",
+          headerShown: true,
+        }}
       />
     </Tab.Navigator>
   );
@@ -108,23 +128,36 @@ function MainTabs() {
 
 function AppNavigator() {
   const { isAuthenticated, loading } = useAuth();
+  const { theme } = useTheme();
+
+  const navigationTheme = useMemo(() => {
+    const base = theme.dark ? NavigationDarkTheme : NavigationDefaultTheme;
+    return {
+      ...base,
+      colors: {
+        ...base.colors,
+        primary: theme.colors.primary,
+        background: theme.colors.background,
+        card: theme.colors.card,
+        text: theme.colors.text,
+        border: theme.colors.border,
+        notification: theme.colors.info,
+      },
+    };
+  }, [theme]);
 
   if (loading) {
-    return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
+    return null;
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={navigationTheme}>
       {isAuthenticated ? (
         <MainTabs />
       ) : (
-        <AuthStack.Navigator id={undefined} screenOptions={{ headerShown: false }}>
-          <AuthStack.Screen name="Login" component={LoginScreen} />
-        </AuthStack.Navigator>
+        <Stack.Navigator id={undefined} screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="Login" component={LoginScreen} />
+        </Stack.Navigator>
       )}
     </NavigationContainer>
   );
@@ -135,7 +168,10 @@ export default function App() {
     <DatabaseProvider>
       <AuthProvider>
         <SyncProvider>
-          <AppNavigator />
+          <ThemeProvider>
+            <AppNavigator />
+            <FlashMessage position="top" />
+          </ThemeProvider>
         </SyncProvider>
       </AuthProvider>
     </DatabaseProvider>

@@ -21,6 +21,8 @@ export interface FlightEntry {
   remarks?: string;
   attachments?: string;
   entryHash?: string;
+  batchId?: string;
+  version?: string;
   syncStatus: "pending" | "synced" | "error";
   lastSyncedAt?: string;
   createdAt: string;
@@ -255,6 +257,7 @@ class Database {
     total: number;
     pending: number;
     synced: number;
+    lastSyncedAt: string | null;
   }> {
     const db = await this.getDb();
     await this.init();
@@ -263,11 +266,13 @@ class Database {
       total: number;
       pending: number;
       synced: number;
+      lastSyncedAt: string | null;
     }>(
       `SELECT
         COUNT(*) as total,
         SUM(CASE WHEN sync_status = 'pending' THEN 1 ELSE 0 END) as pending,
-        SUM(CASE WHEN sync_status = 'synced' THEN 1 ELSE 0 END) as synced
+        SUM(CASE WHEN sync_status = 'synced' THEN 1 ELSE 0 END) as synced,
+        MAX(last_synced_at) as lastSyncedAt
        FROM flight_entries`
     );
 
@@ -275,6 +280,7 @@ class Database {
       total: row?.total ?? 0,
       pending: row?.pending ?? 0,
       synced: row?.synced ?? 0,
+      lastSyncedAt: row?.lastSyncedAt ?? null,
     };
   }
 
@@ -300,6 +306,8 @@ class Database {
       remarks: row.remarks ?? undefined,
       attachments: row.attachments ?? undefined,
       entryHash: row.entry_hash ?? undefined,
+      batchId: undefined,
+      version: undefined,
       syncStatus: row.sync_status as FlightEntry["syncStatus"],
       lastSyncedAt: row.last_synced_at ?? undefined,
       createdAt: row.created_at,
