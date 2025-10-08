@@ -1,18 +1,19 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  View,
-  ScrollView,
-  StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  StyleSheet,
   TouchableOpacity,
+  View,
   Image,
 } from "react-native";
 import {
-  Input,
   Button,
-  Text,
+  Card,
   Icon,
+  Input,
+  Text,
 } from "@rneui/themed";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
@@ -32,6 +33,12 @@ interface RouteParams {
   entryId?: number;
   flightId?: number;
 }
+
+const formatTimeDisplay = (minutes: number) => {
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  return `${hours}:${mins.toString().padStart(2, "0")}`;
+};
 
 export default function AddFlightScreen() {
   const navigation = useNavigation<any>();
@@ -260,17 +267,31 @@ export default function AddFlightScreen() {
         scrollView: {
           flex: 1,
         },
-        section: {
-          paddingHorizontal: 16,
-          paddingVertical: 16,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: theme.colors.border,
+        card: {
+          borderRadius: 16,
+          marginHorizontal: 16,
+          marginTop: 16,
+          padding: 18,
+          backgroundColor: theme.colors.card,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: theme.colors.border,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 8,
+          elevation: 3,
+        },
+        sectionHeader: {
+          flexDirection: "row",
+          alignItems: "center",
+          marginBottom: 18,
         },
         sectionTitle: {
-          fontSize: 18,
-          fontWeight: "600",
+          marginLeft: 12,
+          fontSize: 16,
+          fontWeight: "700",
           color: theme.colors.text,
-          marginBottom: 16,
+          letterSpacing: 0.3,
         },
         row: {
           flexDirection: "row",
@@ -279,20 +300,10 @@ export default function AddFlightScreen() {
         halfInput: {
           flex: 1,
         },
-        label: {
-          fontSize: 13,
-          fontWeight: "500",
-          color: theme.colors.textSecondary,
-          marginLeft: 4,
-          marginBottom: 4,
-        },
-        dateButton: {
-          marginBottom: 16,
-        },
         attachmentButtons: {
           flexDirection: "row",
           gap: 12,
-          marginBottom: 12,
+          marginBottom: 16,
         },
         attachmentButton: {
           flex: 1,
@@ -308,6 +319,7 @@ export default function AddFlightScreen() {
           borderRadius: 12,
           overflow: "hidden",
           position: "relative",
+          backgroundColor: theme.colors.inputBackground,
         },
         attachmentImage: {
           width: "100%",
@@ -319,6 +331,51 @@ export default function AddFlightScreen() {
           right: -8,
           backgroundColor: theme.colors.card,
           borderRadius: 12,
+        },
+        summaryHeading: {
+          fontSize: 22,
+          fontWeight: "700",
+          color: theme.colors.text,
+        },
+        summarySubheading: {
+          fontSize: 14,
+          color: theme.colors.textSecondary,
+          marginTop: 4,
+        },
+        summaryChip: {
+          alignSelf: "flex-start",
+          marginTop: 12,
+          paddingHorizontal: 12,
+          paddingVertical: 6,
+          borderRadius: 999,
+          backgroundColor: theme.colors.inputBackground,
+        },
+        summaryChipText: {
+          fontSize: 12,
+          fontWeight: "600",
+          color: theme.colors.textSecondary,
+        },
+        summaryTotals: {
+          flexDirection: "row",
+          marginTop: 16,
+          gap: 12,
+        },
+        summaryTotalBox: {
+          flex: 1,
+          paddingVertical: 14,
+          paddingHorizontal: 16,
+          borderRadius: 12,
+          backgroundColor: theme.colors.inputBackground,
+        },
+        summaryTotalLabel: {
+          fontSize: 12,
+          color: theme.colors.textSecondary,
+        },
+        summaryTotalValue: {
+          fontSize: 20,
+          fontWeight: "700",
+          color: theme.colors.text,
+          marginTop: 4,
         },
         buttonContainer: {
           padding: 16,
@@ -341,6 +398,43 @@ export default function AddFlightScreen() {
     [theme]
   );
 
+  const renderInput = ({
+    label,
+    value,
+    onChange,
+    keyboardType = "default",
+    containerStyle,
+    autoCapitalize,
+    placeholder = "—",
+  }: {
+    label: string;
+    value: string;
+    onChange: (text: string) => void;
+    keyboardType?: "default" | "numeric" | "email-address";
+    containerStyle?: any;
+    autoCapitalize?: "none" | "sentences" | "words" | "characters";
+    placeholder?: string;
+  }) => (
+    <Input
+      label={label}
+      placeholder={placeholder}
+      value={value}
+      onChangeText={onChange}
+      keyboardType={keyboardType}
+      autoCapitalize={autoCapitalize}
+      containerStyle={[{ marginBottom: 16 }, containerStyle]}
+      inputContainerStyle={{
+        backgroundColor: theme.colors.inputBackground,
+        borderBottomWidth: 0,
+        borderRadius: 10,
+        paddingHorizontal: 12,
+      }}
+      labelStyle={{ color: theme.colors.textSecondary, marginBottom: 6 }}
+      inputStyle={{ color: theme.colors.text }}
+      placeholderTextColor={theme.colors.textSecondary}
+    />
+  );
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -351,18 +445,50 @@ export default function AddFlightScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Flight Details</Text>
+        <Card containerStyle={styles.card}>
+          <Text style={styles.summaryHeading}>
+            {aircraftReg ? aircraftReg.toUpperCase() : "New Flight"}
+          </Text>
+          <Text style={styles.summarySubheading}>
+            {flightDate.toLocaleDateString(undefined, {
+              weekday: "short",
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </Text>
+          <View style={styles.summaryChip}>
+            <Text style={styles.summaryChipText}>
+              {isEditMode ? "Editing" : "Draft"}
+            </Text>
+          </View>
+          <View style={styles.summaryTotals}>
+            <View style={styles.summaryTotalBox}>
+              <Text style={styles.summaryTotalLabel}>Total Time</Text>
+              <Text style={styles.summaryTotalValue}>
+                {totalMinutes > 0 ? formatTimeDisplay(totalMinutes) : "--:--"}
+              </Text>
+            </View>
+            <View style={styles.summaryTotalBox}>
+              <Text style={styles.summaryTotalLabel}>Landings</Text>
+              <Text style={styles.summaryTotalValue}>
+                {Number(landingsDay || 0) + Number(landingsNight || 0)}
+              </Text>
+            </View>
+          </View>
+        </Card>
+
+        <Card containerStyle={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Icon name="airplane-outline" type="ionicon" color={theme.colors.primary} />
+            <Text style={styles.sectionTitle}>Flight Details</Text>
+          </View>
+
           <Button
             title={flightDate.toLocaleDateString()}
             type="outline"
             onPress={() => setShowDatePicker(true)}
-            containerStyle={styles.dateButton}
-            icon={{ name: "calendar-outline", type: "ionicon", color: theme.colors.primary }}
-            titleStyle={{ color: theme.colors.primary }}
-            buttonStyle={{ borderColor: theme.colors.primary }}
           />
-
           {showDatePicker ? (
             <DateTimePicker
               value={flightDate}
@@ -370,191 +496,175 @@ export default function AddFlightScreen() {
               display="default"
               onChange={(_, date) => {
                 setShowDatePicker(false);
-                if (date) {
-                  setFlightDate(date);
-                }
+                if (date) setFlightDate(date);
               }}
             />
           ) : null}
 
-          <Input
-            label="Aircraft Registration *"
-            placeholder="N12345"
-            value={aircraftReg}
-            onChangeText={setAircraftReg}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            leftIcon={{ type: "ionicon", name: "airplane-outline", color: theme.colors.primary }}
-          />
-
-          <Input
-            label="Aircraft Type"
-            placeholder="C172, B737, A320, etc."
-            value={aircraftType}
-            onChangeText={setAircraftType}
-            autoCapitalize="characters"
-            leftIcon={{ type: "ionicon", name: "information-circle-outline", color: theme.colors.primary }}
-          />
-
+          {renderInput({
+            label: "Aircraft Registration *",
+            value: aircraftReg,
+            onChange: setAircraftReg,
+            autoCapitalize: "characters",
+          })}
+          {renderInput({
+            label: "Aircraft Type",
+            value: aircraftType,
+            onChange: setAircraftType,
+            autoCapitalize: "characters",
+          })}
           <View style={styles.row}>
-            <Input
-              label="From *"
-              placeholder="KJFK"
-              value={routeFrom}
-              onChangeText={setRouteFrom}
-              autoCapitalize="characters"
-              containerStyle={styles.halfInput}
-            />
-            <Input
-              label="To *"
-              placeholder="KLAX"
-              value={routeTo}
-              onChangeText={setRouteTo}
-              autoCapitalize="characters"
-              containerStyle={styles.halfInput}
-            />
+            {renderInput({
+              label: "From *",
+              value: routeFrom,
+              onChange: setRouteFrom,
+              autoCapitalize: "characters",
+              containerStyle: styles.halfInput,
+            })}
+            {renderInput({
+              label: "To *",
+              value: routeTo,
+              onChange: setRouteTo,
+              autoCapitalize: "characters",
+              containerStyle: styles.halfInput,
+            })}
           </View>
-        </View>
+        </Card>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Flight Time</Text>
-
-          <Text style={styles.label}>PIC Time</Text>
-          <View style={styles.row}>
-            <Input
-              placeholder="Hours"
-              value={picHours}
-              onChangeText={setPicHours}
-              keyboardType="numeric"
-              containerStyle={styles.halfInput}
-            />
-            <Input
-              placeholder="Minutes"
-              value={picMinutes}
-              onChangeText={setPicMinutes}
-              keyboardType="numeric"
-              containerStyle={styles.halfInput}
-            />
+        <Card containerStyle={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Icon name="time-outline" type="ionicon" color={theme.colors.primary} />
+            <Text style={styles.sectionTitle}>Flight Time</Text>
           </View>
 
-          <Text style={styles.label}>SIC Time</Text>
           <View style={styles.row}>
-            <Input
-              placeholder="Hours"
-              value={sicHours}
-              onChangeText={setSicHours}
-              keyboardType="numeric"
-              containerStyle={styles.halfInput}
-            />
-            <Input
-              placeholder="Minutes"
-              value={sicMinutes}
-              onChangeText={setSicMinutes}
-              keyboardType="numeric"
-              containerStyle={styles.halfInput}
-            />
+            {renderInput({
+              label: "PIC Hours",
+              value: picHours,
+              onChange: setPicHours,
+              keyboardType: "numeric",
+              containerStyle: styles.halfInput,
+            })}
+            {renderInput({
+              label: "PIC Minutes",
+              value: picMinutes,
+              onChange: setPicMinutes,
+              keyboardType: "numeric",
+              containerStyle: styles.halfInput,
+            })}
           </View>
-
-          <Text style={styles.label}>Dual Time</Text>
           <View style={styles.row}>
-            <Input
-              placeholder="Hours"
-              value={dualHours}
-              onChangeText={setDualHours}
-              keyboardType="numeric"
-              containerStyle={styles.halfInput}
-            />
-            <Input
-              placeholder="Minutes"
-              value={dualMinutes}
-              onChangeText={setDualMinutes}
-              keyboardType="numeric"
-              containerStyle={styles.halfInput}
-            />
+            {renderInput({
+              label: "SIC Hours",
+              value: sicHours,
+              onChange: setSicHours,
+              keyboardType: "numeric",
+              containerStyle: styles.halfInput,
+            })}
+            {renderInput({
+              label: "SIC Minutes",
+              value: sicMinutes,
+              onChange: setSicMinutes,
+              keyboardType: "numeric",
+              containerStyle: styles.halfInput,
+            })}
           </View>
-
-          <Text style={styles.label}>Night Time</Text>
           <View style={styles.row}>
-            <Input
-              placeholder="Hours"
-              value={nightHours}
-              onChangeText={setNightHours}
-              keyboardType="numeric"
-              containerStyle={styles.halfInput}
-            />
-            <Input
-              placeholder="Minutes"
-              value={nightMinutes}
-              onChangeText={setNightMinutes}
-              keyboardType="numeric"
-              containerStyle={styles.halfInput}
-            />
+            {renderInput({
+              label: "Dual Hours",
+              value: dualHours,
+              onChange: setDualHours,
+              keyboardType: "numeric",
+              containerStyle: styles.halfInput,
+            })}
+            {renderInput({
+              label: "Dual Minutes",
+              value: dualMinutes,
+              onChange: setDualMinutes,
+              keyboardType: "numeric",
+              containerStyle: styles.halfInput,
+            })}
           </View>
-
-          <Text style={styles.label}>Instrument Time</Text>
           <View style={styles.row}>
-            <Input
-              placeholder="Hours"
-              value={instrumentHours}
-              onChangeText={setInstrumentHours}
-              keyboardType="numeric"
-              containerStyle={styles.halfInput}
-            />
-            <Input
-              placeholder="Minutes"
-              value={instrumentMinutes}
-              onChangeText={setInstrumentMinutes}
-              keyboardType="numeric"
-              containerStyle={styles.halfInput}
-            />
+            {renderInput({
+              label: "Night Hours",
+              value: nightHours,
+              onChange: setNightHours,
+              keyboardType: "numeric",
+              containerStyle: styles.halfInput,
+            })}
+            {renderInput({
+              label: "Night Minutes",
+              value: nightMinutes,
+              onChange: setNightMinutes,
+              keyboardType: "numeric",
+              containerStyle: styles.halfInput,
+            })}
           </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Landings</Text>
           <View style={styles.row}>
-            <Input
-              label="Day"
-              placeholder="0"
-              value={landingsDay}
-              onChangeText={setLandingsDay}
-              keyboardType="numeric"
-              containerStyle={styles.halfInput}
-            />
-            <Input
-              label="Night"
-              placeholder="0"
-              value={landingsNight}
-              onChangeText={setLandingsNight}
-              keyboardType="numeric"
-              containerStyle={styles.halfInput}
-            />
+            {renderInput({
+              label: "Instrument Hours",
+              value: instrumentHours,
+              onChange: setInstrumentHours,
+              keyboardType: "numeric",
+              containerStyle: styles.halfInput,
+            })}
+            {renderInput({
+              label: "Instrument Minutes",
+              value: instrumentMinutes,
+              onChange: setInstrumentMinutes,
+              keyboardType: "numeric",
+              containerStyle: styles.halfInput,
+            })}
           </View>
-        </View>
+        </Card>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Attachments</Text>
+        <Card containerStyle={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Icon name="trail-sign-outline" type="ionicon" color={theme.colors.primary} />
+            <Text style={styles.sectionTitle}>Landings</Text>
+          </View>
+          <View style={styles.row}>
+            {renderInput({
+              label: "Day",
+              value: landingsDay,
+              onChange: setLandingsDay,
+              keyboardType: "numeric",
+              containerStyle: styles.halfInput,
+            })}
+            {renderInput({
+              label: "Night",
+              value: landingsNight,
+              onChange: setLandingsNight,
+              keyboardType: "numeric",
+              containerStyle: styles.halfInput,
+            })}
+          </View>
+        </Card>
+
+        <Card containerStyle={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Icon name="images-outline" type="ionicon" color={theme.colors.primary} />
+            <Text style={styles.sectionTitle}>Attachments</Text>
+          </View>
           <View style={styles.attachmentButtons}>
             <Button
               title="Take Photo"
               type="outline"
               onPress={takePhoto}
-              icon={{ name: "camera-outline", type: "ionicon", color: theme.colors.primary }}
+              containerStyle={styles.attachmentButton}
               titleStyle={{ color: theme.colors.primary }}
               buttonStyle={{ borderColor: theme.colors.primary }}
-              containerStyle={styles.attachmentButton}
             />
             <Button
               title="Choose Photo"
               type="outline"
               onPress={pickImage}
-              icon={{ name: "images-outline", type: "ionicon", color: theme.colors.primary }}
+              containerStyle={styles.attachmentButton}
               titleStyle={{ color: theme.colors.primary }}
               buttonStyle={{ borderColor: theme.colors.primary }}
-              containerStyle={styles.attachmentButton}
             />
           </View>
-
           {attachments.length > 0 && (
             <View style={styles.attachmentsList}>
               {attachments.map((attachment, index) => (
@@ -570,18 +680,29 @@ export default function AddFlightScreen() {
               ))}
             </View>
           )}
-        </View>
+        </Card>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Remarks</Text>
+        <Card containerStyle={styles.card}>
+          <View style={styles.sectionHeader}>
+            <Icon name="create-outline" type="ionicon" color={theme.colors.primary} />
+            <Text style={styles.sectionTitle}>Remarks</Text>
+          </View>
           <Input
             placeholder="Additional notes..."
             value={remarks}
             onChangeText={setRemarks}
             multiline
             numberOfLines={4}
+            inputContainerStyle={{
+              backgroundColor: theme.colors.inputBackground,
+              borderBottomWidth: 0,
+              borderRadius: 10,
+              paddingHorizontal: 12,
+            }}
+            inputStyle={{ color: theme.colors.text }}
+            placeholderTextColor={theme.colors.textSecondary}
           />
-        </View>
+        </Card>
 
         <View style={styles.buttonContainer}>
           <Button
