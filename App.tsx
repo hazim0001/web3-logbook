@@ -23,12 +23,14 @@ import ProfileScreen from "./screens/ProfileScreen";
 import SyncStatusScreen from "./screens/SyncStatusScreen";
 import AirportSetupScreen from "./screens/AirportSetupScreen";
 import { shouldShowAirportSetup } from "./utils/checkAirportSetup";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function LogbookStack() {
   const { theme } = useTheme();
+  // AsyncStorage.clear();
 
   return (
     <Stack.Navigator
@@ -82,7 +84,9 @@ function MainTabs() {
             iconName = "person";
           }
 
-          return <Icon name={iconName} type="ionicon" size={size} color={color} />;
+          return (
+            <Icon name={iconName} type="ionicon" size={size} color={color} />
+          );
         },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.textSecondary,

@@ -13,6 +13,7 @@ export default function AirportSetupScreen({ navigation }: { navigation: any }) 
   const [isSeeding, setIsSeeding] = useState(false);
   const [progress, setProgress] = useState<string>("");
   const [isComplete, setIsComplete] = useState(false);
+  const usingMockData = __DEV__;
 
   useEffect(() => {
     checkIfAlreadySeeded();
@@ -29,13 +30,14 @@ export default function AirportSetupScreen({ navigation }: { navigation: any }) 
     }
   };
 
-  const handleSetup = async () => {
+  const handleSetup = async (options?: { forceDownload?: boolean }) => {
+    const forceDownload = options?.forceDownload ?? false;
     setIsSeeding(true);
-    setProgress("Preparing...");
+    setProgress(forceDownload ? "Downloading full dataset..." : "Preparing...");
 
     try {
       await AirportSeeder.seedAirports({
-        forceDownload: false,
+        forceDownload,
         onProgress: (status) => setProgress(status),
       });
 
@@ -185,12 +187,27 @@ export default function AirportSetupScreen({ navigation }: { navigation: any }) 
             </View>
           </View>
 
+          {usingMockData ? (
+            <Text style={[styles.description, { fontSize: 14, marginTop: 8 }]}>
+              Development build detected: seeding with bundled mock data. Use the production build
+              to download the full airport database.
+            </Text>
+          ) : null}
+
           <View style={styles.buttonContainer}>
             <Button
-              title="Download Airport Database"
-              onPress={handleSetup}
+              title={usingMockData ? "Seed Mock Airport Database" : "Download Airport Database"}
+              onPress={() => handleSetup()}
               buttonStyle={styles.button}
             />
+            {usingMockData ? (
+              <Button
+                title="Download Full Airport Database (~10MB)"
+                type="outline"
+                onPress={() => handleSetup({ forceDownload: true })}
+                buttonStyle={styles.button}
+              />
+            ) : null}
             <Button
               title="Skip for Now"
               onPress={handleSkip}
