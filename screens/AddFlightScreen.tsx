@@ -131,12 +131,6 @@ export default function AddFlightScreen() {
     }
   }, [entryId]);
 
-  useEffect(() => {
-    if (departureAirport && arrivalAirport) {
-      clearAirportErrors();
-    }
-  }, [departureAirport, arrivalAirport, clearAirportErrors]);
-
   const departureTimezoneInfo = useMemo(() => {
     if (!departureAirport) {
       return null;

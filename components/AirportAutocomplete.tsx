@@ -1,12 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   Keyboard,
   StyleSheet,
   TextInput,
   TouchableOpacity,
   View,
+  ScrollView,
 } from "react-native";
 import { Icon, Text } from "@rneui/themed";
 import { useTheme } from "../contexts/ThemeContext";
@@ -39,11 +39,13 @@ export default function AirportAutocomplete({
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const displayValue = value
-    ? `${value.icaoCode}${value.iataCode ? ` / ${value.iataCode}` : ""} - ${value.name}`
+    ? `${value.icaoCode}${value.iataCode ? ` / ${value.iataCode}` : ""} - ${
+        value.name
+      }`
     : query;
 
   useEffect(() => {
-    if (query.length >= 2) {
+    if (query.length >= 1) {
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
@@ -124,7 +126,9 @@ export default function AirportAutocomplete({
       borderWidth: 1,
       borderColor: error ? theme.colors.error : theme.colors.border,
       borderRadius: 10,
-      backgroundColor: disabled ? theme.colors.card : theme.colors.inputBackground,
+      backgroundColor: disabled
+        ? theme.colors.card
+        : theme.colors.inputBackground,
       paddingHorizontal: 12,
       minHeight: 50,
     },
@@ -222,7 +226,12 @@ export default function AirportAutocomplete({
             showResults && results.length > 0 ? styles.inputFocused : null,
           ]}
         >
-          <Icon name="airplane-outline" type="ionicon" size={20} color={theme.colors.textSecondary} />
+          <Icon
+            name="airplane-outline"
+            type="ionicon"
+            size={20}
+            color={theme.colors.textSecondary}
+          />
           {value ? (
             <Text style={styles.selectedValue} numberOfLines={1}>
               {displayValue}
@@ -246,23 +255,34 @@ export default function AirportAutocomplete({
               onPress={handleClear}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Icon name="close-circle" type="ionicon" size={20} color={theme.colors.textSecondary} />
+              <Icon
+                name="close-circle"
+                type="ionicon"
+                size={20}
+                color={theme.colors.textSecondary}
+              />
             </TouchableOpacity>
           ) : null}
 
           {isSearching ? (
-            <ActivityIndicator size="small" color={theme.colors.primary} style={{ marginLeft: 8 }} />
+            <ActivityIndicator
+              size="small"
+              color={theme.colors.primary}
+              style={{ marginLeft: 8 }}
+            />
           ) : null}
         </View>
 
         {showResults && results.length > 0 ? (
           <View style={styles.resultsContainer}>
-            <FlatList
-              data={results}
-              keyExtractor={(item) => item.id.toString()}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => (
-                <TouchableOpacity style={styles.resultItem} onPress={() => handleSelect(item)} activeOpacity={0.7}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              {results.map((item) => (
+                <TouchableOpacity
+                  key={item.id?.toString() ?? item.icaoCode}
+                  style={styles.resultItem}
+                  onPress={() => handleSelect(item)}
+                  activeOpacity={0.7}
+                >
                   <Text style={styles.resultPrimary}>{item.name}</Text>
                   {item.city ? (
                     <Text style={styles.resultSecondary}>
@@ -275,15 +295,20 @@ export default function AirportAutocomplete({
                     {item.iataCode ? ` / ${item.iataCode}` : ""}
                   </Text>
                 </TouchableOpacity>
-              )}
-            />
+              ))}
+            </ScrollView>
           </View>
         ) : null}
 
-        {showResults && !isSearching && query.length >= 2 && results.length === 0 ? (
+        {showResults &&
+        !isSearching &&
+        query.length >= 2 &&
+        results.length === 0 ? (
           <View style={[styles.resultsContainer, styles.emptyStateContainer]}>
             <Text style={styles.emptyStateText}>No airports found.</Text>
-            <Text style={[styles.emptyStateText, { fontSize: 12, marginTop: 6 }]}>
+            <Text
+              style={[styles.emptyStateText, { fontSize: 12, marginTop: 6 }]}
+            >
               Try searching by ICAO, IATA, or airport name.
             </Text>
           </View>
@@ -296,9 +321,14 @@ export default function AirportAutocomplete({
 }
 
 export function useAirportSelection() {
-  const [departureAirport, setDepartureAirport] = useState<Airport | null>(null);
+  const [departureAirport, setDepartureAirport] = useState<Airport | null>(
+    null
+  );
   const [arrivalAirport, setArrivalAirport] = useState<Airport | null>(null);
-  const [errors, setErrors] = useState<{ departure?: string; arrival?: string }>({});
+  const [errors, setErrors] = useState<{
+    departure?: string;
+    arrival?: string;
+  }>({});
 
   const validateAirports = (): boolean => {
     const nextErrors: typeof errors = {};

@@ -53,10 +53,34 @@ export function utcToLocalTime(utcTimestamp: string, timezone: string): string {
 
 function getTimezoneOffset(timezone: string, date: Date): number {
   try {
-    const utcDate = new Date(date.toLocaleString("en-US", { timeZone: "UTC" }));
-    const tzDate = new Date(date.toLocaleString("en-US", { timeZone: timezone }));
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
 
-    return (tzDate.getTime() - utcDate.getTime()) / 60000;
+    const parts = formatter.formatToParts(date);
+    const getPart = (type: Intl.DateTimeFormatPart["type"]) =>
+      parts.find((part) => part.type === type)?.value ?? "0";
+
+    const year = Number.parseInt(getPart("year"), 10);
+    const month = Number.parseInt(getPart("month"), 10) - 1;
+    const day = Number.parseInt(getPart("day"), 10);
+    const hour = Number.parseInt(getPart("hour"), 10);
+    const minute = Number.parseInt(getPart("minute"), 10);
+    const second = Number.parseInt(getPart("second"), 10);
+
+    const localUtcTimestamp = Date.UTC(year, month, day, hour, minute, second);
+    const offsetMinutes = Math.round(
+      (localUtcTimestamp - date.getTime()) / 60000
+    );
+
+    return offsetMinutes;
   } catch (error) {
     console.error("Error getting timezone offset:", error);
     return 0;
@@ -147,7 +171,7 @@ export function getAirportTimezoneInfo(airport: Airport): {
   const offsetHours = Math.floor(Math.abs(offsetMinutes) / 60);
   const offsetMins = Math.abs(offsetMinutes) % 60;
   const sign = offsetMinutes >= 0 ? "+" : "-";
-  const offset = `${sign}${offsetHours.toString().padStart(2, "0")}:${offsetMins
+  const offset = `GMT ${sign}${offsetHours.toString().padStart(2, "0")}:${offsetMins
     .toString()
     .padStart(2, "0")}`;
 
