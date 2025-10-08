@@ -40,7 +40,6 @@ import {
   getAirportTimezoneInfo,
   isValidTimeFormat,
   localTimeToUTC,
-  parseTimeInput,
   utcToLocalTime,
 } from "../utils/timezoneUtils";
 
@@ -107,8 +106,6 @@ export default function AddFlightScreen() {
   const [picMinutes, setPicMinutes] = useState("");
   const [sicHours, setSicHours] = useState("");
   const [sicMinutes, setSicMinutes] = useState("");
-  const [dualHours, setDualHours] = useState("");
-  const [dualMinutes, setDualMinutes] = useState("");
   const [nightHours, setNightHours] = useState("");
   const [nightMinutes, setNightMinutes] = useState("");
   const [instrumentHours, setInstrumentHours] = useState("");
@@ -145,11 +142,10 @@ export default function AddFlightScreen() {
     return getAirportTimezoneInfo(arrivalAirport);
   }, [arrivalAirport]);
 
-  const totalMinutes = useMemo(() => {
+  const manualEntryMinutes = useMemo(() => {
     const values = [
       convertToMinutes(picHours, picMinutes),
       convertToMinutes(sicHours, sicMinutes),
-      convertToMinutes(dualHours, dualMinutes),
       convertToMinutes(nightHours, nightMinutes),
       convertToMinutes(instrumentHours, instrumentMinutes),
     ];
@@ -159,12 +155,133 @@ export default function AddFlightScreen() {
     picMinutes,
     sicHours,
     sicMinutes,
-    dualHours,
-    dualMinutes,
     nightHours,
     nightMinutes,
     instrumentHours,
     instrumentMinutes,
+  ]);
+
+  const computeDurationMinutes = useCallback(
+    (
+      out: string,
+      outTimezone?: string,
+      arrival: string = "",
+      arrivalTimezone?: string
+    ): number | null => {
+      if (
+        out.length !== 4 ||
+        arrival.length !== 4 ||
+        !outTimezone ||
+        !arrivalTimezone
+      ) {
+        return null;
+      }
+
+      try {
+        const dateStr = flightDate.toISOString().split("T")[0];
+        const depUtc = localTimeToUTC(dateStr, out, outTimezone);
+        const arrUtc = localTimeToUTC(dateStr, arrival, arrivalTimezone);
+        const durationHours = calculateFlightDuration(depUtc, arrUtc);
+        if (!Number.isFinite(durationHours)) {
+          return null;
+        }
+        return Math.round(durationHours * 60);
+      } catch (error) {
+        console.error("Duration calculation error:", error);
+        return null;
+      }
+    },
+    [flightDate]
+  );
+
+  const actualDurationMinutes = useMemo(
+    () =>
+      computeDurationMinutes(
+        actualOut,
+        departureAirport?.timezone,
+        actualIn,
+        arrivalAirport?.timezone
+      ),
+    [
+      actualIn,
+      actualOut,
+      arrivalAirport?.timezone,
+      computeDurationMinutes,
+      departureAirport?.timezone,
+    ]
+  );
+
+  const scheduledDurationMinutes = useMemo(
+    () =>
+      computeDurationMinutes(
+        scheduledOut,
+        departureAirport?.timezone,
+        scheduledIn,
+        arrivalAirport?.timezone
+      ),
+    [
+      arrivalAirport?.timezone,
+      computeDurationMinutes,
+      departureAirport?.timezone,
+      scheduledIn,
+      scheduledOut,
+    ]
+  );
+
+  const flightDuration = useMemo(() => {
+    if (actualDurationMinutes !== null) {
+      return { minutes: actualDurationMinutes, source: "actual" as const };
+    }
+
+    if (scheduledDurationMinutes !== null) {
+      return {
+        minutes: scheduledDurationMinutes,
+        source: "scheduled" as const,
+      };
+    }
+
+    return null;
+  }, [
+    actualDurationMinutes,
+    scheduledDurationMinutes,
+  ]);
+
+  const totalMinutes = useMemo(() => {
+    if (flightDuration?.minutes) {
+      return flightDuration.minutes;
+    }
+    return manualEntryMinutes;
+  }, [flightDuration, manualEntryMinutes]);
+
+  const secondaryDuration = useMemo(() => {
+    if (flightDuration?.source === "actual" && scheduledDurationMinutes !== null) {
+      return {
+        label: "Planned Duration",
+        minutes: scheduledDurationMinutes,
+      };
+    }
+
+    if (flightDuration?.source === "scheduled" && actualDurationMinutes !== null) {
+      return {
+        label: "Actual Duration",
+        minutes: actualDurationMinutes,
+      };
+    }
+
+    if (manualEntryMinutes > 0 && manualEntryMinutes !== totalMinutes) {
+      return {
+        label: "Logged Time (Manual)",
+        minutes: manualEntryMinutes,
+      };
+    }
+
+    return null;
+  }, [
+    actualDurationMinutes,
+    flightDuration,
+    manualEntryMinutes,
+    scheduledDurationMinutes,
+    totalMinutes,
   ]);
 
   const totalLandings = useMemo(() => {
@@ -211,8 +328,6 @@ export default function AddFlightScreen() {
       setPicMinutes((entry.picTime % 60).toString());
       setSicHours(Math.floor(entry.sicTime / 60).toString());
       setSicMinutes((entry.sicTime % 60).toString());
-      setDualHours(Math.floor(entry.dualTime / 60).toString());
-      setDualMinutes((entry.dualTime % 60).toString());
       setNightHours(Math.floor(entry.nightTime / 60).toString());
       setNightMinutes((entry.nightTime % 60).toString());
       setInstrumentHours(Math.floor(entry.instrumentTime / 60).toString());
@@ -395,12 +510,8 @@ export default function AddFlightScreen() {
 
   const handleTimeChange =
     (setter: (value: string) => void) => (text: string) => {
-      const parsed = parseTimeInput(text);
-      if (parsed) {
-        setter(parsed);
-      } else {
-        setter(text);
-      }
+      const digitsOnly = text.replace(/\D/g, "");
+      setter(digitsOnly.slice(0, 4));
     };
 
   const pickImage = async () => {
@@ -475,32 +586,30 @@ export default function AddFlightScreen() {
     try {
       const picTime = convertToMinutes(picHours, picMinutes);
       const sicTime = convertToMinutes(sicHours, sicMinutes);
-      const dualTime = convertToMinutes(dualHours, dualMinutes);
       const nightTime = convertToMinutes(nightHours, nightMinutes);
-      const instrumentTime = convertToMinutes(instrumentHours, instrumentMinutes);
-      const totalTime = Math.max(
-        picTime,
-        sicTime,
-        dualTime,
-        nightTime,
-        instrumentTime
+      const instrumentTime = convertToMinutes(
+        instrumentHours,
+        instrumentMinutes
       );
+      const manualTotal = manualEntryMinutes;
+      const dualTime = 0;
+      const totalTime = flightDuration?.minutes ?? manualTotal;
 
       const additionalData: AdditionalFlightData = {};
 
       if (flightNumber) {
         additionalData.flightNumber = flightNumber;
       }
-      if (scheduledOut) {
+      if (scheduledOut.length === 4) {
         additionalData.scheduledOut = scheduledOut;
       }
-      if (scheduledIn) {
+      if (scheduledIn.length === 4) {
         additionalData.scheduledIn = scheduledIn;
       }
-      if (actualOut) {
+      if (actualOut.length === 4) {
         additionalData.actualOut = actualOut;
       }
-      if (actualIn) {
+      if (actualIn.length === 4) {
         additionalData.actualIn = actualIn;
       }
 
@@ -509,7 +618,7 @@ export default function AddFlightScreen() {
       let departureTimeUtc: string | undefined;
       let arrivalTimeUtc: string | undefined;
 
-      if (actualOut && departureAirport?.timezone) {
+      if (actualOut.length === 4 && departureAirport?.timezone) {
         departureTimeUtc = localTimeToUTC(
           dateStr,
           actualOut,
@@ -518,7 +627,7 @@ export default function AddFlightScreen() {
         additionalData.actualOutUtc = departureTimeUtc;
       }
 
-      if (actualIn && arrivalAirport?.timezone) {
+      if (actualIn.length === 4 && arrivalAirport?.timezone) {
         arrivalTimeUtc = localTimeToUTC(
           dateStr,
           actualIn,
@@ -527,7 +636,7 @@ export default function AddFlightScreen() {
         additionalData.actualInUtc = arrivalTimeUtc;
       }
 
-      if (scheduledOut && departureAirport?.timezone) {
+      if (scheduledOut.length === 4 && departureAirport?.timezone) {
         additionalData.scheduledOutUtc = localTimeToUTC(
           dateStr,
           scheduledOut,
@@ -535,7 +644,7 @@ export default function AddFlightScreen() {
         );
       }
 
-      if (scheduledIn && arrivalAirport?.timezone) {
+      if (scheduledIn.length === 4 && arrivalAirport?.timezone) {
         additionalData.scheduledInUtc = localTimeToUTC(
           dateStr,
           scheduledIn,
@@ -669,11 +778,13 @@ export default function AddFlightScreen() {
         },
         summaryTotals: {
           flexDirection: "row",
+          flexWrap: "wrap",
           marginTop: 16,
           gap: 12,
         },
         summaryTotalBox: {
           flex: 1,
+          minWidth: 120,
           paddingVertical: 14,
           paddingHorizontal: 16,
           borderRadius: 12,
@@ -702,6 +813,9 @@ export default function AddFlightScreen() {
         helpText: {
           fontSize: 12,
           color: theme.colors.textSecondary,
+          marginBottom: 12,
+        },
+        timezoneDetails: {
           marginBottom: 12,
         },
         switchRow: {
@@ -846,7 +960,13 @@ export default function AddFlightScreen() {
           </View>
           <View style={styles.summaryTotals}>
             <View style={styles.summaryTotalBox}>
-              <Text style={styles.summaryTotalLabel}>Total Time</Text>
+              <Text style={styles.summaryTotalLabel}>
+                {flightDuration?.source === "actual"
+                  ? "Total Time (Actual)"
+                  : flightDuration?.source === "scheduled"
+                  ? "Total Time (Planned)"
+                  : "Total Time"}
+              </Text>
               <Text style={styles.summaryTotalValue}>
                 {totalMinutes > 0 ? formatTimeDisplay(totalMinutes) : "--:--"}
               </Text>
@@ -855,6 +975,14 @@ export default function AddFlightScreen() {
               <Text style={styles.summaryTotalLabel}>Landings</Text>
               <Text style={styles.summaryTotalValue}>{totalLandings}</Text>
             </View>
+            {secondaryDuration ? (
+              <View style={styles.summaryTotalBox}>
+                <Text style={styles.summaryTotalLabel}>{secondaryDuration.label}</Text>
+                <Text style={styles.summaryTotalValue}>
+                  {formatTimeDisplay(secondaryDuration.minutes)}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </Card>
 
@@ -990,10 +1118,26 @@ export default function AddFlightScreen() {
             })}
           </View>
 
-          {actualOut && departureTimezoneInfo ? (
-            <Text style={styles.helpText}>
-              {formatTimeWithTimezone(actualOut, departureTimezoneInfo.timezone)}
-            </Text>
+          {departureTimezoneInfo &&
+          (scheduledOut.length === 4 || actualOut.length === 4) ? (
+            <View style={styles.timezoneDetails}>
+              {scheduledOut.length === 4 ? (
+                <Text style={styles.helpText}>
+                  {`Scheduled: ${formatTimeWithTimezone(
+                    scheduledOut,
+                    departureTimezoneInfo.timezone
+                  )} (${departureTimezoneInfo.offset})`}
+                </Text>
+              ) : null}
+              {actualOut.length === 4 ? (
+                <Text style={styles.helpText}>
+                  {`Actual: ${formatTimeWithTimezone(
+                    actualOut,
+                    departureTimezoneInfo.timezone
+                  )} (${departureTimezoneInfo.offset})`}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
 
           <View style={styles.row}>
@@ -1017,10 +1161,26 @@ export default function AddFlightScreen() {
             })}
           </View>
 
-          {actualIn && arrivalTimezoneInfo ? (
-            <Text style={styles.helpText}>
-              {formatTimeWithTimezone(actualIn, arrivalTimezoneInfo.timezone)}
-            </Text>
+          {arrivalTimezoneInfo &&
+          (scheduledIn.length === 4 || actualIn.length === 4) ? (
+            <View style={styles.timezoneDetails}>
+              {scheduledIn.length === 4 ? (
+                <Text style={styles.helpText}>
+                  {`Scheduled: ${formatTimeWithTimezone(
+                    scheduledIn,
+                    arrivalTimezoneInfo.timezone
+                  )} (${arrivalTimezoneInfo.offset})`}
+                </Text>
+              ) : null}
+              {actualIn.length === 4 ? (
+                <Text style={styles.helpText}>
+                  {`Actual: ${formatTimeWithTimezone(
+                    actualIn,
+                    arrivalTimezoneInfo.timezone
+                  )} (${arrivalTimezoneInfo.offset})`}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
         </Card>
 
@@ -1067,26 +1227,6 @@ export default function AddFlightScreen() {
               label: "SIC Minutes",
               value: sicMinutes,
               onChange: setSicMinutes,
-              keyboardType: "number-pad",
-              containerStyle: styles.halfInput,
-              placeholder: "00",
-              maxLength: 2,
-            })}
-          </View>
-
-          <View style={styles.row}>
-            {renderInput({
-              label: "Dual Hours",
-              value: dualHours,
-              onChange: setDualHours,
-              keyboardType: "number-pad",
-              containerStyle: styles.halfInput,
-              placeholder: "0",
-            })}
-            {renderInput({
-              label: "Dual Minutes",
-              value: dualMinutes,
-              onChange: setDualMinutes,
               keyboardType: "number-pad",
               containerStyle: styles.halfInput,
               placeholder: "00",
