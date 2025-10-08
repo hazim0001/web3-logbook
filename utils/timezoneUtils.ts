@@ -100,7 +100,13 @@ export function calculateFlightDuration(departureUtc: string, arrivalUtc: string
   const departure = new Date(departureUtc);
   const arrival = new Date(arrivalUtc);
 
-  const durationMs = arrival.getTime() - departure.getTime();
+  const dayMs = 24 * 60 * 60 * 1000;
+  let durationMs = arrival.getTime() - departure.getTime();
+
+  while (durationMs < 0) {
+    durationMs += dayMs;
+  }
+
   const durationHours = durationMs / (1000 * 60 * 60);
 
   return Math.round(durationHours * 100) / 100;

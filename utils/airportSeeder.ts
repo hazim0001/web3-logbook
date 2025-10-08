@@ -1,6 +1,10 @@
 import * as FileSystem from "expo-file-system";
 import database, { Airport } from "../services/database";
 
+const mockAirports = require("../assets/mockAirports.json") as Array<
+  Omit<Airport, "id">
+>;
+
 interface OurAirportsCSVRow {
   id: string;
   ident: string;
@@ -66,6 +70,15 @@ export class AirportSeeder {
     const { forceDownload = false, onProgress } = options;
 
     try {
+      if (__DEV__ && !forceDownload) {
+        onProgress?.("Loading development airport dataset...");
+        await database.bulkInsertAirports(
+          mockAirports as Array<Omit<Airport, "id">>
+        );
+        onProgress?.("Airport database ready!");
+        return;
+      }
+
       onProgress?.("Checking for cached airport data...");
 
       const cacheInfo = await FileSystem.getInfoAsync(this.CACHE_FILE);

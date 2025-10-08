@@ -1,5 +1,6 @@
 import "react-native-gesture-handler";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { View, ActivityIndicator } from "react-native";
 import {
   NavigationContainer,
   DefaultTheme as NavigationDefaultTheme,
@@ -20,6 +21,8 @@ import AddFlightScreen from "./screens/AddFlightScreen";
 import FlightDetailScreen from "./screens/FlightDetailScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import SyncStatusScreen from "./screens/SyncStatusScreen";
+import AirportSetupScreen from "./screens/AirportSetupScreen";
+import { shouldShowAirportSetup } from "./utils/checkAirportSetup";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -129,6 +132,8 @@ function MainTabs() {
 function AppNavigator() {
   const { isAuthenticated, loading } = useAuth();
   const { theme } = useTheme();
+  const [setupChecked, setSetupChecked] = useState(false);
+  const [needsSetup, setNeedsSetup] = useState(false);
 
   const navigationTheme = useMemo(() => {
     const base = theme.dark ? NavigationDarkTheme : NavigationDefaultTheme;
@@ -146,14 +151,70 @@ function AppNavigator() {
     };
   }, [theme]);
 
-  if (loading) {
-    return null;
+  useEffect(() => {
+    let isMounted = true;
+
+    const checkSetup = async () => {
+      if (!isAuthenticated) {
+        if (isMounted) {
+          setNeedsSetup(false);
+          setSetupChecked(true);
+        }
+        return;
+      }
+
+      if (isMounted) {
+        setSetupChecked(false);
+      }
+
+      try {
+        const required = await shouldShowAirportSetup();
+        if (isMounted) {
+          setNeedsSetup(required);
+        }
+      } catch (error) {
+        console.error("Failed to determine airport setup:", error);
+        if (isMounted) {
+          setNeedsSetup(true);
+        }
+      } finally {
+        if (isMounted) {
+          setSetupChecked(true);
+        }
+      }
+    };
+
+    checkSetup();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated]);
+
+  if (loading || (isAuthenticated && !setupChecked)) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: theme.colors.background,
+        }}
+      >
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
   }
 
   return (
     <NavigationContainer theme={navigationTheme}>
       {isAuthenticated ? (
-        <MainTabs />
+        <Stack.Navigator id={undefined} screenOptions={{ headerShown: false }}>
+          {needsSetup ? (
+            <Stack.Screen name="AirportSetup" component={AirportSetupScreen} />
+          ) : null}
+          <Stack.Screen name="MainTabs" component={MainTabs} />
+        </Stack.Navigator>
       ) : (
         <Stack.Navigator id={undefined} screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Login" component={LoginScreen} />
