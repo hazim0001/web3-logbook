@@ -8,13 +8,7 @@ import {
   View,
   Image,
 } from "react-native";
-import {
-  Button,
-  Card,
-  Icon,
-  Input,
-  Text,
-} from "@rneui/themed";
+import { Button, Card, Icon, Input, Text } from "@rneui/themed";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as ImagePicker from "expo-image-picker";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -135,7 +129,10 @@ export default function AddFlightScreen() {
 
   const validateForm = () => {
     if (!aircraftReg.trim()) {
-      showMessage({ message: "Aircraft registration is required", type: "warning" });
+      showMessage({
+        message: "Aircraft registration is required",
+        type: "warning",
+      });
       return false;
     }
 
@@ -155,7 +152,10 @@ export default function AddFlightScreen() {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      showMessage({ message: "Photo library access is required", type: "warning" });
+      showMessage({
+        message: "Photo library access is required",
+        type: "warning",
+      });
       return;
     }
 
@@ -205,7 +205,10 @@ export default function AddFlightScreen() {
 
   const handleSave = async (asDraft = true) => {
     if (!user) {
-      showMessage({ message: "You must be logged in to log a flight", type: "danger" });
+      showMessage({
+        message: "You must be logged in to log a flight",
+        type: "danger",
+      });
       return;
     }
 
@@ -233,7 +236,8 @@ export default function AddFlightScreen() {
         landingsDay: parseInt(landingsDay || "0", 10),
         landingsNight: parseInt(landingsNight || "0", 10),
         remarks: remarks.trim() || undefined,
-        attachments: attachments.length > 0 ? JSON.stringify(attachments) : undefined,
+        attachments:
+          attachments.length > 0 ? JSON.stringify(attachments) : undefined,
         syncStatus: "pending",
       };
 
@@ -480,7 +484,11 @@ export default function AddFlightScreen() {
 
         <Card containerStyle={styles.card}>
           <View style={styles.sectionHeader}>
-            <Icon name="airplane-outline" type="ionicon" color={theme.colors.primary} />
+            <Icon
+              name="airplane-outline"
+              type="ionicon"
+              color={theme.colors.primary}
+            />
             <Text style={styles.sectionTitle}>Flight Details</Text>
           </View>
 
@@ -533,7 +541,11 @@ export default function AddFlightScreen() {
 
         <Card containerStyle={styles.card}>
           <View style={styles.sectionHeader}>
-            <Icon name="time-outline" type="ionicon" color={theme.colors.primary} />
+            <Icon
+              name="time-outline"
+              type="ionicon"
+              color={theme.colors.primary}
+            />
             <Text style={styles.sectionTitle}>Flight Time</Text>
           </View>
 
@@ -571,16 +583,16 @@ export default function AddFlightScreen() {
           </View>
           <View style={styles.row}>
             {renderInput({
-              label: "Dual Hours",
-              value: dualHours,
-              onChange: setDualHours,
+              label: "Instrument Hours",
+              value: instrumentHours,
+              onChange: setInstrumentHours,
               keyboardType: "numeric",
               containerStyle: styles.halfInput,
             })}
             {renderInput({
-              label: "Dual Minutes",
-              value: dualMinutes,
-              onChange: setDualMinutes,
+              label: "Instrument Minutes",
+              value: instrumentMinutes,
+              onChange: setInstrumentMinutes,
               keyboardType: "numeric",
               containerStyle: styles.halfInput,
             })}
@@ -601,27 +613,15 @@ export default function AddFlightScreen() {
               containerStyle: styles.halfInput,
             })}
           </View>
-          <View style={styles.row}>
-            {renderInput({
-              label: "Instrument Hours",
-              value: instrumentHours,
-              onChange: setInstrumentHours,
-              keyboardType: "numeric",
-              containerStyle: styles.halfInput,
-            })}
-            {renderInput({
-              label: "Instrument Minutes",
-              value: instrumentMinutes,
-              onChange: setInstrumentMinutes,
-              keyboardType: "numeric",
-              containerStyle: styles.halfInput,
-            })}
-          </View>
         </Card>
 
         <Card containerStyle={styles.card}>
           <View style={styles.sectionHeader}>
-            <Icon name="trail-sign-outline" type="ionicon" color={theme.colors.primary} />
+            <Icon
+              name="trail-sign-outline"
+              type="ionicon"
+              color={theme.colors.primary}
+            />
             <Text style={styles.sectionTitle}>Landings</Text>
           </View>
           <View style={styles.row}>
@@ -644,7 +644,11 @@ export default function AddFlightScreen() {
 
         <Card containerStyle={styles.card}>
           <View style={styles.sectionHeader}>
-            <Icon name="images-outline" type="ionicon" color={theme.colors.primary} />
+            <Icon
+              name="images-outline"
+              type="ionicon"
+              color={theme.colors.primary}
+            />
             <Text style={styles.sectionTitle}>Attachments</Text>
           </View>
           <View style={styles.attachmentButtons}>
@@ -668,13 +672,24 @@ export default function AddFlightScreen() {
           {attachments.length > 0 && (
             <View style={styles.attachmentsList}>
               {attachments.map((attachment, index) => (
-                <View key={`${attachment.uri}-${index}`} style={styles.attachmentItem}>
-                  <Image source={{ uri: attachment.uri }} style={styles.attachmentImage} />
+                <View
+                  key={`${attachment.uri}-${index}`}
+                  style={styles.attachmentItem}
+                >
+                  <Image
+                    source={{ uri: attachment.uri }}
+                    style={styles.attachmentImage}
+                  />
                   <TouchableOpacity
                     style={styles.removeButton}
                     onPress={() => removeAttachment(index)}
                   >
-                    <Icon name="close-circle" type="ionicon" color={theme.colors.error} size={24} />
+                    <Icon
+                      name="close-circle"
+                      type="ionicon"
+                      color={theme.colors.error}
+                      size={24}
+                    />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -684,7 +699,11 @@ export default function AddFlightScreen() {
 
         <Card containerStyle={styles.card}>
           <View style={styles.sectionHeader}>
-            <Icon name="create-outline" type="ionicon" color={theme.colors.primary} />
+            <Icon
+              name="create-outline"
+              type="ionicon"
+              color={theme.colors.primary}
+            />
             <Text style={styles.sectionTitle}>Remarks</Text>
           </View>
           <Input

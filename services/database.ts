@@ -327,6 +327,17 @@ class Database {
     console.log("Airports inserted successfully");
   }
 
+  async getAirportCount(): Promise<number> {
+    const db = await this.getDb();
+    await this.init();
+
+    const row = await db.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) as count FROM airports WHERE active = 1"
+    );
+
+    return row?.count ?? 0;
+  }
+
   async createEntry(
     entry: Omit<FlightEntry, "id" | "createdAt" | "updatedAt">
   ): Promise<number> {
