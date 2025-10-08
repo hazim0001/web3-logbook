@@ -10,3 +10,5 @@
 - [ ] Ensure the backend login response returns `access_token`, `refresh_token`, and `user` in the shape expected by `AuthContext`.
 - [ ] Update `LoginScreen` to capture and submit optional TOTP codes when required.
 - [ ] Define UX for token refresh failures (e.g., redirect to login or show a toast) and implement it.
+- [ ] Surface extended flight entry fields (airports, times, night calculation metadata) across add/edit/detail screens.
+- [ ] Seed the `airports` table or wire it to backend sync so search helpers return real data.
